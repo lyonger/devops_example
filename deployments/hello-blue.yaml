@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-blue
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: hello
+      track: stable
+  template:
+    metadata:
+      labels:
+        app: hello
+        track: stable
+        version: v1.0.0
+    spec:
+      containers:
+        - name: hello
+          image: lyonger/cicd_test:v1.0.0
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8888
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8888
+              scheme: HTTP
