@@ -1,0 +1,106 @@
+# This file is a template, and might need editing before it works on your project.
+# To contribute improvements to CI/CD templates, please follow the Development guide at:
+# https://docs.gitlab.com/ee/development/cicd/templates.html
+# This specific template is located at:
+# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Bash.gitlab-ci.yml
+
+# See https://docs.gitlab.com/ee/ci/yaml/README.html for all available options
+
+# you can delete this line if you're not using Docker
+image: dtzar/helm-kubectl
+
+variables:
+  DOCKER_REGISTRY: docker.io
+
+before_script:
+  - env
+
+after_script:
+  - echo "job is done"
+
+build:
+  stage: build
+  image: docker:19.03.12
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_TLS_VERIFY: 1
+    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+  services:
+    - docker:19.03.12-dind
+  before_script:
+    - env
+    - docker info    
+  script:
+    # login dockerhub
+    - echo "docker login $DOCKER_REGISTRY"
+    - docker login $DOCKER_REGISTRY -u ${DOCKER_HUB_USER} -p ${DOCKER_HUB_PASSWD}
+      
+    # get image url
+    - REPO=`echo $CI_PROJECT_DIR | awk -F '/' '{print $NF}'`
+    - DOCKER_REPO="${DOCKER_HUB_USER}/$REPO"
+    - IMAGE_TAG=${DOCKER_REGISTRY}/$DOCKER_REPO:${CI_COMMIT_REF_NAME}
+    - IMAGE_LATEST=${DOCKER_REGISTRY}/$DOCKER_REPO:latest
+
+    # build docker image
+    - echo "docker build -t $IMAGE_TAG"
+    - cd nginx-hello-world
+    - docker build --no-cache -t $IMAGE_TAG .
+    
+    # tag docker image
+    - echo "docker tag  $IMAGE_TAG $IMAGE_LATEST"
+    - docker tag  $IMAGE_TAG $IMAGE_LATEST
+
+    # push docker image
+    - echo "$ docker push $IMAGE_TAG"
+    - docker push $IMAGE_TAG
+    - echo "$ docker push $IMAGE_LATEST"
+    - docker push $IMAGE_LATEST
+
+    # logout dockerhub
+    - docker logout $DOCKER_REGISTRY
+
+test:
+  stage: test
+  script:
+    - echo "Do a test here"
+
+deploy_blue_app:
+  stage: deploy
+  environment:
+    name: production
+    url: https://devops.learning.lagou.com
+  when: manual
+  allow_failure: false
+  script:
+    - kubectl apply -f deployments/hello-blue.yaml
+
+deploy_blue_svc:
+  stage: deploy
+  environment:
+    name: production
+    url: https://devops.learning.lagou.com
+  when: manual
+  allow_failure: false
+  script:
+    - kubectl apply -f services/hello-blue.yaml
+
+deploy_green_app:
+  stage: deploy
+  environment:
+    name: production
+    url: https://devops.learning.lagou.com
+  when: manual
+  allow_failure: false
+  script:
+    - kubectl apply -f deployments/hello-green.yaml
+
+deploy_green_svc:
+  stage: deploy
+  environment:
+    name: production
+    url: https://devops.learning.lagou.com
+  when: manual
+  allow_failure: false
+  script:
+    - kubectl apply -f services/hello-green.yaml
